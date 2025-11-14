@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أداة قرعة العروض</title>
+    <!-- تحميل Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* إضافة خط مخصص يدعم العربية بشكل جيد (اختياري، خطوط Tailwind الافتراضية جيدة) */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Noto Kufi Arabic', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6 md:p-10">
+    <div class="container mx-auto max-w-4xl">
+
+        <!-- العنوان -->
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-teal-700">أداة قرعة العروض</h1>
+            <p class="text-lg text-gray-600 mt-2">لتوزيع المواضيع على المجموعات بشكل عشوائي</p>
+        </header>
+
+        <!-- أقسام الإدخال -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            
+            <!-- إدخال المجموعات -->
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4 text-teal-600">المجموعات (أو الأسماء)</h2>
+                <textarea id="groupsInput"
+                    class="w-full h-48 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition duration-200"
+                    placeholder="أدخل كل مجموعة أو اسم في سطر جديد...
+مجموعة 1
+مجموعة 2
+أحمد
+فاطمة"></textarea>
+                <p class="text-sm text-gray-500 mt-2">أدخل كل مجموعة أو اسم في سطر مستقل.</p>
+            </div>
+
+            <!-- إدخال المواضيع -->
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4 text-teal-600">المواضيع</h2>
+                <textarea id="topicsInput"
+                    class="w-full h-48 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition duration-200"
+                    placeholder="أدخل كل موضوع في سطر جديد...
+الموضوع أ
+الموضوع ب
+الموضوع ج"></textarea>
+                <p class="text-sm text-gray-500 mt-2">أدخل كل موضوع في سطر مستقل.</p>
+            </div>
+        </div>
+
+        <!-- رسالة الخطأ أو التحذير -->
+        <div id="messageBox" class="text-center mb-6 font-semibold min-h-[1.5em]">
+            <!-- سيتم ملء هذا الحقل عبر جافاسكريبت -->
+        </div>
+
+        <!-- زر إجراء القرعة -->
+        <div class="text-center mb-10">
+            <button id="drawButton"
+                class="bg-teal-600 text-white font-bold text-lg py-3 px-10 rounded-full shadow-md hover:bg-teal-700 transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-50">
+                إجراء القرعة
+            </button>
+        </div>
+
+        <!-- قسم النتائج -->
+        <div id="resultsSection" class="bg-white p-6 rounded-xl shadow-lg max-w-2xl mx-auto hidden">
+            <h2 class="text-2xl font-semibold mb-6 text-center text-teal-700">النتائج</h2>
+            <ul id="resultsList" class="space-y-3">
+                <!-- سيتم ملء النتائج هنا -->
+            </ul>
+        </div>
+
+    </div>
+
+    <script>
+        // --- عناصر التحكم ---
+        const groupsInput = document.getElementById('groupsInput');
+        const topicsInput = document.getElementById('topicsInput');
+        const drawButton = document.getElementById('drawButton');
+        const messageBox = document.getElementById('messageBox');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsList = document.getElementById('resultsList');
+
+        // --- وظيفة خلط المصفوفة (Fisher-Yates Shuffle) ---
+        function shuffle(array) {
+            let currentIndex = array.length,  randomIndex;
+            // أثناء وجود عناصر للخلط
+            while (currentIndex != 0) {
+                // اختر عنصرًا متبقيًا
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                // وقم بتبديله مع العنصر الحالي
+                [array[currentIndex], array[randomIndex]] = [
+                array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        // --- وظيفة إجراء القرعة ---
+        function runDraw() {
+            // 1. تنظيف الرسائل السابقة وإخفاء النتائج
+            messageBox.textContent = '';
+            messageBox.className = 'text-center mb-6 font-semibold min-h-[1.5em]';
+            resultsSection.classList.add('hidden');
+            resultsList.innerHTML = '';
+
+            // 2. الحصول على المدخلات وتنظيفها
+            const groups = groupsInput.value.split('\n')
+                                      .map(s => s.trim())
+                                      .filter(s => s.length > 0);
+            
+            const topics = topicsInput.value.split('\n')
+                                      .map(s => s.trim())
+                                      .filter(s => s.length > 0);
+
+            // 3. التحقق من المدخلات
+            if (groups.length === 0 || topics.length === 0) {
+                messageBox.textContent = 'الرجاء إدخال المجموعات والمواضيع أولاً.';
+                messageBox.classList.add('text-red-600');
+                return;
+            }
+
+            // 4. التحذير إذا كانت الأعداد غير متطابقة
+            if (groups.length !== topics.length) {
+                messageBox.textContent = 'تحذير: عدد المجموعات لا يساوي عدد المواضيع. سيتم التعيين بشكل دوري.';
+                messageBox.classList.add('text-yellow-600');
+            }
+
+            // 5. خلط القوائم
+            const shuffledGroups = shuffle([...groups]);
+            const shuffledTopics = shuffle([...topics]);
+
+            // 6. إنشاء التعيينات
+            const assignments = [];
+            for (let i = 0; i < shuffledGroups.length; i++) {
+                const group = shuffledGroups[i];
+                // استخدام (i % shuffledTopics.length) ليتم تكرار المواضيع إذا كانت أقل من المجموعات
+                const topic = shuffledTopics[i % shuffledTopics.length];
+                assignments.push({ group, topic });
+            }
+
+            // 7. عرض النتائج
+            assignments.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center bg-gray-50 p-4 rounded-lg border';
+                
+                const groupSpan = document.createElement('span');
+                groupSpan.className = 'font-semibold text-teal-700';
+                groupSpan.textContent = item.group;
+
+                const topicSpan = document.createElement('span');
+                topicSpan.className = 'text-gray-800';
+                topicSpan.textContent = item.topic;
+
+                const arrowSpan = document.createElement('span');
+                arrowSpan.className = 'text-gray-400';
+                arrowSpan.textContent = '←';
+
+                li.appendChild(topicSpan);
+                li.appendChild(arrowSpan);
+                li.appendChild(groupSpan);
+                
+                resultsList.appendChild(li);
+            });
+
+            // إظهار قسم النتائج
+            resultsSection.classList.remove('hidden');
+        }
+
+        // --- ربط الحدث بالزر ---
+        drawButton.addEventListener('click', runDraw);
+
+    </script>
+</body>
+</html>
